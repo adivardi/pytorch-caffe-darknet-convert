@@ -21,7 +21,7 @@ model_names = sorted(name for name in models.__dict__
 model_names.append('mobilenet')
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
+parser.add_argument('--data', '-d', metavar='DIR', default='',
                     help='path to dataset')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
                     #choices=model_names,
@@ -50,6 +50,8 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
+parser.add_argument('--darknet-cfg', dest='darknet_cfg', help='darknet config file')
+parser.add_argument('--darknet-weights', dest='darknet_weights', help='darknet config file')
 
 best_prec1 = 0
 
@@ -171,6 +173,10 @@ def main():
         if args.arch.startswith('mobilenet'):
             model = Net()
             print(model)
+        elif args.arch.startswith('darknet'):
+            from darknet import Darknet
+            model = Darknet(args.darknet_cfg)
+            model.load_weights(args.darknet_weights)
         else:
             model = models.__dict__[args.arch]()
 
@@ -189,6 +195,10 @@ def main():
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
+
+    if args.data == '':
+        print("No data directory given, skip training")
+        return
 
    # optionally resume from a checkpoint
     if args.resume:
@@ -279,7 +289,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = target.cuda(async=True)
+        target = target.cuda(non_blocking=True)
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
 
@@ -324,7 +334,7 @@ def validate(val_loader, model, criterion):
 
     end = time.time()
     for i, (input, target) in enumerate(val_loader):
-        target = target.cuda(async=True)
+        target = target.cuda(non_blocking=True)
         if args.arch == 'resnet50-kaiming' or args.arch == 'resnet50-kaiming-dk' or args.arch == 'resnet18-caffe' or args.arch == 'resnet18-darknet':
             input = torch.stack([input[:,2,:,:], input[:,1,:,:], input[:,0,:,:]],1)
             input = input * 255
