@@ -1,19 +1,26 @@
 import torch
 from collections import OrderedDict
 
+
 def parse_cfg(cfgfile):
     def erase_comment(line):
-        line = line.split('#')[0]
+        line = line.split('#')[0]   # split comment and keep only the beginning of the line
         return line
+
+    def empty_line(line):
+        if line == '' or line[0] == '#' or line.startswith('#') or line.isspace():    # skip empty, whitespace and comment lines
+            return True
+        return False
+
     blocks = []
     fp = open(cfgfile, 'r')
     block =  None
     line = fp.readline()
     while line != '':
         line = line.rstrip()
-        if line == '' or line[0] == '#':
+        if empty_line(line):    # skip empty, whitespace and comment lines
             line = fp.readline()
-            continue        
+            continue
         elif line[0] == '[':
             if block:
                 blocks.append(block)
@@ -24,6 +31,9 @@ def parse_cfg(cfgfile):
                 block['batch_normalize'] = 0
         else:
             line = erase_comment(line)
+            if empty_line(line):
+                line = fp.readline()
+                continue
             key,value = line.split('=')
             key = key.strip()
             if key == 'type':
@@ -72,8 +82,10 @@ def print_cfg_nicely(blocks):
             filters = int(block['filters'])
             kernel_size = int(block['size'])
             stride = int(block['stride'])
-            is_pad = int(block['pad'])
-            pad = (kernel_size-1)/2 if is_pad else 0
+            if 'pad' in block and int(block['pad']) == 1:
+                pad = int((kernel_size-1)/2)
+            else:
+                pad = int(block.get('padding', 0))
             width = (prev_width + 2*pad - kernel_size)/stride + 1
             height = (prev_height + 2*pad - kernel_size)/stride + 1
             print('%5d %-6s %4d  %d x %d / %d   %3d x %3d x%4d   ->   %3d x %3d x%4d' % (ind, 'conv', filters, kernel_size, kernel_size, stride, prev_width, prev_height, prev_filters, width, height, filters))
@@ -196,7 +208,8 @@ def load_conv_bn(buf, start, conv_model, bn_model):
     bn_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
     bn_model.running_mean.copy_(torch.from_numpy(buf[start:start+num_b]));  start = start + num_b
     bn_model.running_var.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
-    conv_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_w])); start = start + num_w 
+    # missing bias if exists ...
+    conv_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_w])); start = start + num_w
     return start
 
 def save_conv_bn(fp, conv_model, bn_model):
@@ -231,7 +244,7 @@ def load_fc(buf, start, fc_model):
     num_w = fc_model.weight.numel()
     num_b = fc_model.bias.numel()
     fc_model.bias.data.copy_(torch.from_numpy(buf[start:start+num_b]));     start = start + num_b
-    fc_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_w]));   start = start + num_w 
+    fc_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_w]));   start = start + num_w
     return start
 
 def save_fc(fp, fc_model):

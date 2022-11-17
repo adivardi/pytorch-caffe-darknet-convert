@@ -3,7 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
-from cfg import *
+# from cfg import *
+from cfg import parse_cfg, print_cfg, load_conv_bn
+from cfg_onnx2pytorch import load_conv
 
 class FCView(nn.Module):
     def __init__(self):
@@ -163,22 +165,24 @@ class Darknet(nn.Module):
                 filters = int(block['filters'])
                 kernel_size = int(block['size'])
                 stride = int(block['stride'])
-                is_pad = int(block['pad'])
-                pad = (kernel_size-1)/2 if is_pad else 0
+                if 'pad' in block and int(block['pad']) == 1:
+                    padding = int((kernel_size-1)/2)
+                else:
+                    padding = int(block.get('padding', 0))
                 activation = block['activation']
                 model = nn.Sequential()
                 if batch_normalize:
-                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
+                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, padding, bias=False))
                     model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
                 else:
-                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
+                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, padding))
                 if activation == 'leaky':
                     model.add_module('leaky{0}'.format(conv_id), nn.LeakyReLU(0.1, inplace=True))
                 elif activation == 'relu':
                     model.add_module('relu{0}'.format(conv_id), nn.ReLU(inplace=True))
                 prev_filters = filters
-                prev_width = (prev_width + 2*pad - kernel_size)/stride + 1
-                prev_height = (prev_height + 2*pad - kernel_size)/stride + 1
+                prev_width = (prev_width + 2*padding - kernel_size)/stride + 1
+                prev_height = (prev_height + 2*padding - kernel_size)/stride + 1
                 out_filters.append(prev_filters)
                 out_width.append(prev_width)
                 out_height.append(prev_height)
@@ -187,7 +191,7 @@ class Darknet(nn.Module):
                 pool_size = int(block['size'])
                 stride = int(block['stride'])
                 padding = 0
-                if block.has_key('pad') and int(block['pad']) == 1:
+                if 'pad' in block and int(block['pad']) == 1:
                     padding = int((pool_size-1)/2)
                 if stride > 1:
                     model = nn.MaxPool2d(pool_size, stride, padding=padding)
@@ -317,11 +321,11 @@ class Darknet(nn.Module):
                 continue
             else:
                 print('unknown type %s' % (block['type']))
-    
+
         return models
 
     def load_weights(self, weightfile):
-        if self.blocks[0].has_key('mean_file'):
+        if 'mean_file' in self.blocks[0]:
             import caffe_pb2
             mean_file = self.blocks[0]['mean_file']
             mean_file = mean_file.strip('"')
@@ -514,7 +518,7 @@ class Darknet(nn.Module):
         blocks = self.blocks
         for block in blocks:
             if block['type'] == 'convolutional':
-               block['batch_normalize'] = '0' 
+               block['batch_normalize'] = '0'
         save_cfg(blocks, out_cfgfile)
 
 if __name__ == '__main__':
