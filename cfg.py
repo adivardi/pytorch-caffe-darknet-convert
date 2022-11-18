@@ -204,12 +204,21 @@ def save_conv(fp, conv_model):
 def load_conv_bn(buf, start, conv_model, bn_model):
     num_w = conv_model.weight.numel()
     num_b = bn_model.bias.numel()
+    print(f"num_w: {num_w}")
+    print(f"num_b: {num_b}")
     bn_model.bias.data.copy_(torch.from_numpy(buf[start:start+num_b]));     start = start + num_b
     bn_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
     bn_model.running_mean.copy_(torch.from_numpy(buf[start:start+num_b]));  start = start + num_b
     bn_model.running_var.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
     # missing bias if exists ...
-    conv_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_w])); start = start + num_w
+    print(bn_model)
+    print(conv_model.weight.data.size())
+    print(conv_model.weight.data.numel())
+    print(f"buf {torch.from_numpy(buf[start:start+num_w]).size()}")
+    print(f"buf {torch.from_numpy(buf[start:start+num_w]).numel()}")
+    print(f"buf numpy {buf[start:start+num_w].shape}")
+    print(f"buf reshape {torch.reshape(torch.from_numpy(buf[start:start+num_w]), conv_model.weight.data.size()).size()}")
+    conv_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]), conv_model.weight.data.size())); start = start + num_w
     return start
 
 def save_conv_bn(fp, conv_model, bn_model):
