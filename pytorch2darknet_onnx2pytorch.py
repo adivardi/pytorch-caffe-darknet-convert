@@ -1,6 +1,7 @@
 import torch
 import onnx2pytorch
-from cfg_onnx2pytorch import save_conv, save_conv_bn, save_fc
+from cfg_onnx2pytorch import save_conv, save_conv_bn
+from cfg import save_fc
 from IPython import embed
 
 def save_custom_weights(model, filename):
@@ -88,7 +89,7 @@ def save_custom_weights(model, filename):
 """
 
 model_path = '/home/adi/Projects/traffic_lights/traffic_lights_detection/models/autoware2_traffic_light_classifier_mobilenetv2_model.pt'
-result_path = '/home/adi/Projects/traffic_lights/traffic_lights_detection/models/converted_darknet_model.weights'
+result_path = '/home/adi/Projects/traffic_lights/traffic_lights_detection/models/autoware2_traffic_light_classifier_mobilenetv2_model_darknet.weights'
 device = 'cpu'  # don't use cuda for conversion
 
 
