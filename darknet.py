@@ -160,26 +160,42 @@ class Darknet(nn.Module):
                 prev_height = int(block['height'])
                 continue
             elif block['type'] == 'convolutional':
-                conv_id = conv_id + 1
                 batch_normalize = int(block['batch_normalize'])
                 filters = int(block['filters'])
                 kernel_size = int(block['size'])
+                if not isinstance(kernel_size, int):  # not single-size conv => multiple-size conv
+                    raise NotImplementedError("Missing Feature: MixConv2d")
+
                 stride = int(block['stride'])
                 if 'pad' in block and int(block['pad']) == 1:
                     padding = int((kernel_size-1)/2)
                 else:
                     padding = int(block.get('padding', 0))
+                groups = int(block.get('groups', 1))
                 activation = block['activation']
                 model = nn.Sequential()
+                # add conv model
+                model.add_module(f"conv{conv_id}", nn.Conv2d(in_channels=prev_filters,
+                                                            out_channels=filters,
+                                                            kernel_size=kernel_size,
+                                                            stride=stride,
+                                                            padding=padding,
+                                                            groups=groups,
+                                                            bias=not batch_normalize))
+
                 if batch_normalize:
-                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, padding, bias=False))
-                    model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
-                else:
-                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, padding))
+                    model.add_module(f"n{conv_id}", nn.BatchNorm2d(filters))
+
                 if activation == 'leaky':
-                    model.add_module('leaky{0}'.format(conv_id), nn.LeakyReLU(0.1, inplace=True))
+                    model.add_module(f"leaky{conv_id}", nn.LeakyReLU(0.1, inplace=True))
                 elif activation == 'relu':
-                    model.add_module('relu{0}'.format(conv_id), nn.ReLU(inplace=True))
+                    model.add_module(f"relu{conv_id}", nn.ReLU(inplace=True))
+                elif activation == 'linear':
+                    pass
+                else:
+                    print(block)
+                    raise NotImplementedError(f"Missing activation type: {activation}")
+
                 prev_filters = filters
                 prev_width = (prev_width + 2*padding - kernel_size)/stride + 1
                 prev_height = (prev_height + 2*padding - kernel_size)/stride + 1
@@ -187,6 +203,9 @@ class Darknet(nn.Module):
                 out_width.append(prev_width)
                 out_height.append(prev_height)
                 models.append(model)
+                conv_id = conv_id + 1
+            elif block['type'] == 'batchnorm':
+                raise NotImplementedError(f"Missing Feature: batchnorm -  separate Batch-normalization layer")
             elif block['type'] == 'maxpool':
                 pool_size = int(block['size'])
                 stride = int(block['stride'])

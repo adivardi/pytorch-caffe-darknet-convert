@@ -26,9 +26,9 @@ def parse_cfg(cfgfile):
                 blocks.append(block)
             block = OrderedDict()
             block['type'] = line.lstrip('[').rstrip(']')
-            # set default value
-            if block['type'] == 'convolutional':
-                block['batch_normalize'] = 0
+            # # set default value
+            # if block['type'] == 'convolutional':
+            #     block['batch_normalize'] = 0
         else:
             line = erase_comment(line)
             if empty_line(line):

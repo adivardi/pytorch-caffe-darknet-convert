@@ -13,6 +13,22 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+from prettytable import PrettyTable
+
+def count_parameters(model):
+    table = PrettyTable(["Mod name", "Parameters Listed", "Parameters Shape"])
+    t_params = 0
+
+    for name, parameter in model.named_parameters():
+        # if not parameter.requires_grad:
+        #     continue
+        param = parameter.numel()
+        table.add_row([name, param, list(parameter.size())])
+        t_params += param
+    print(table)
+    print(f"Sum of trained parameters: {t_params}")
+    return t_params
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -176,6 +192,8 @@ def main():
         elif args.arch.startswith('darknet'):
             from darknet import Darknet
             model = Darknet(args.darknet_cfg)
+            print(model)
+            count_parameters(model)
             model.load_weights(args.darknet_weights)
         else:
             model = models.__dict__[args.arch]()
